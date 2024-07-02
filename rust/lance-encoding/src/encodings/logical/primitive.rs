@@ -5,6 +5,7 @@ use std::{fmt::Debug, ops::Range, sync::Arc};
 
 use arrow_array::{new_null_array, ArrayRef};
 use arrow_schema::DataType;
+use arrow_select::concat::concat;
 use futures::{future::BoxFuture, FutureExt};
 use lance_arrow::deepcopy::deep_copy_array;
 use log::{debug, trace};
@@ -341,10 +342,13 @@ impl AccumulationQueue {
                 "Flushing column {} page of size {} bytes (unencoded)",
                 self.column_index, self.current_bytes
             );
-            // Push into buffered_arrays without copy since we are about to flush anyways
             self.buffered_arrays.push(array);
+            /*
+            // Push into buffered_arrays without copy since we are about to flush anyways
             self.current_bytes = 0;
             Some(std::mem::take(&mut self.buffered_arrays))
+            */
+            Some(self.slice_buffered_arrays_into_flush_task_arrays())
         } else {
             trace!(
                 "Accumulating data for column {}.  Now at {} bytes",
@@ -352,9 +356,9 @@ impl AccumulationQueue {
                 self.current_bytes
             );
             if self.keep_original_array {
-                self.buffered_arrays.push(array);
-            } else {
                 self.buffered_arrays.push(deep_copy_array(array.as_ref()))
+            } else {
+                self.buffered_arrays.push(array);
             }
             None
         }
@@ -373,9 +377,58 @@ impl AccumulationQueue {
                 self.column_index,
                 self.current_bytes
             );
-            self.current_bytes = 0;
-            Some(std::mem::take(&mut self.buffered_arrays))
+            Some(self.slice_all_buffered_arrays_into_flush_task_arrays())
         }
+    }
+
+    fn slice_buffered_arrays_into_flush_task_arrays(&mut self) -> Vec<ArrayRef> {
+        let concat_array = concat(
+            &std::mem::take(&mut self.buffered_arrays)
+                .iter()
+                .map(|arr| arr.as_ref())
+                .collect::<Vec<_>>(),
+        )
+        .unwrap();
+        let flush_task_num = concat_array.get_array_memory_size() / self.cache_bytes as usize;
+        let step = concat_array.len() / flush_task_num;
+        let mut flush_task_arrays = Vec::new();
+        let mut offset = 0;
+        for _ in 0..flush_task_num {
+            let array = concat_array.slice(offset, step);
+            offset += step;
+            flush_task_arrays.push(array);
+        }
+        if offset < concat_array.len() {
+            self.buffered_arrays = vec![concat_array.slice(offset, concat_array.len() - offset)];
+            self.current_bytes = self.buffered_arrays[0].get_array_memory_size() as u64;
+        } else {
+            self.buffered_arrays = Vec::new();
+            self.current_bytes = 0;
+        }
+        flush_task_arrays
+    }
+
+    fn slice_all_buffered_arrays_into_flush_task_arrays(&mut self) -> Vec<ArrayRef> {
+        let concat_array = concat(
+            &std::mem::take(&mut self.buffered_arrays)
+                .iter()
+                .map(|arr| arr.as_ref())
+                .collect::<Vec<_>>(),
+        )
+        .unwrap();
+        let flush_task_num = concat_array.get_array_memory_size() / self.cache_bytes as usize;
+        let step = concat_array.len() / flush_task_num;
+        let mut flush_task_arrays = Vec::new();
+        let mut offset = 0;
+        for _ in 0..flush_task_num - 1 {
+            let array = concat_array.slice(offset, step);
+            offset += step;
+            flush_task_arrays.push(array);
+        }
+        flush_task_arrays.push(concat_array.slice(offset, concat_array.len()));
+        self.buffered_arrays = Vec::new();
+        self.current_bytes = 0;
+        flush_task_arrays
     }
 }
 
@@ -424,19 +477,27 @@ impl PrimitiveFieldEncoder {
 }
 
 impl FieldEncoder for PrimitiveFieldEncoder {
-    // Buffers data, if there is enough to write a page then we create an encode task
+    // Buffers data, if there is enough to write a page then we create encode tasks
     fn maybe_encode(&mut self, array: ArrayRef) -> Result<Vec<EncodeTask>> {
         if let Some(arrays) = self.accumulation_queue.insert(array) {
-            Ok(vec![self.do_flush(arrays)?])
+            let tasks = arrays
+                .into_iter()
+                .map(|array| self.do_flush(vec![array]))
+                .collect::<Result<Vec<EncodeTask>>>()?;
+            Ok(tasks)
         } else {
             Ok(vec![])
         }
     }
 
-    // If there is any data left in the buffer then create an encode task from it
+    // If there is any data left in the buffer then create encode tasks from it
     fn flush(&mut self) -> Result<Vec<EncodeTask>> {
         if let Some(arrays) = self.accumulation_queue.flush() {
-            Ok(vec![self.do_flush(arrays)?])
+            let tasks = arrays
+                .into_iter()
+                .map(|array| self.do_flush(vec![array]))
+                .collect::<Result<Vec<EncodeTask>>>()?;
+            Ok(tasks)
         } else {
             Ok(vec![])
         }
