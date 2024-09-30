@@ -468,19 +468,24 @@ impl PrimitivePageDecoder for BitpackedForNonNegPageDecoder {
 
         let elem_size_in_bytes = self.uncompressed_bits_per_value / 8;
 
-        Ok(DataBlock::FixedWidth(FixedWidthDataBlock {
+        println!("num_rows * elem_size_in_bytes: {}", num_rows * elem_size_in_bytes);
+        let res = Ok(DataBlock::FixedWidth(FixedWidthDataBlock {
             data: self.decompressed_buf.slice_with_length(
                 (rows_to_skip * elem_size_in_bytes) as usize,
                 (num_rows * elem_size_in_bytes) as usize,
             ),
             bits_per_value: self.uncompressed_bits_per_value,
             num_values: num_rows,
-        }))
+        }));
+
+        println!("can I reach the `decode` method");
+        res
     }
 }
 
 macro_rules! bitpacked_decode {
     ($uncompressed_type:ty, $compressed_bit_width:expr, $data:expr, $bytes_idx_to_range_indices:expr, $num_rows:expr) => {{
+        println!("can I reach here?");
         let mut decompressed: Vec<$uncompressed_type> = Vec::with_capacity($num_rows as usize);
         let packed_chunk_size_in_byte: usize = (ELEMS_PER_CHUNK * $compressed_bit_width) as usize / 8;
         let mut decompress_chunk_buf = vec![0 as $uncompressed_type; ELEMS_PER_CHUNK as usize];
@@ -490,6 +495,7 @@ macro_rules! bitpacked_decode {
             let mut curr_range_start = $bytes_idx_to_range_indices[i][0].start;
             let mut chunk_num = 0;
 
+            println!("bytes_idx_to_range_indices: {:?}", $bytes_idx_to_range_indices);
             while chunk_num * packed_chunk_size_in_byte < bytes.len() {
                 // Copy for memory alignment
                 let chunk_in_u8: Vec<u8> = bytes[chunk_num * packed_chunk_size_in_byte..]
@@ -509,8 +515,13 @@ macro_rules! bitpacked_decode {
                     // Case 1: All the elements after (curr_range_start % ELEMS_PER_CHUNK) inside this chunk are needed.
                     let elems_after_curr_range_start_in_this_chunk =
                         ELEMS_PER_CHUNK - curr_range_start % ELEMS_PER_CHUNK;
+                    
                     if curr_range_start + elems_after_curr_range_start_in_this_chunk
-                        <= $bytes_idx_to_range_indices[i][ranges_idx].end
+                        == $bytes_idx_to_range_indices[i][ranges_idx].end {
+                            println!("hahah, got you");
+                        }
+                    if curr_range_start + elems_after_curr_range_start_in_this_chunk
+                        < $bytes_idx_to_range_indices[i][ranges_idx].end
                     {
                         decompressed.extend_from_slice(
                             &decompress_chunk_buf[(curr_range_start % ELEMS_PER_CHUNK) as usize..],
@@ -522,6 +533,9 @@ macro_rules! bitpacked_decode {
                         let elems_this_range_needed_in_this_chunk =
                             ($bytes_idx_to_range_indices[i][ranges_idx].end - curr_range_start)
                                 .min(ELEMS_PER_CHUNK - curr_range_start % ELEMS_PER_CHUNK);
+                        if elems_this_range_needed_in_this_chunk == 0 {
+                            println!("hahah, elems_this_range_needed_in_this_chunk is 0");
+                        }
                         decompressed.extend_from_slice(
                             &decompress_chunk_buf[(curr_range_start % ELEMS_PER_CHUNK) as usize..]
                                 [..elems_this_range_needed_in_this_chunk as usize],
@@ -541,7 +555,7 @@ macro_rules! bitpacked_decode {
                 }
             }
         }
-
+        println!("decompressed: {:?}, num_rows: {:?}", decompressed.len(), $num_rows);
         LanceBuffer::reinterpret_vec(decompressed)
     }};
 }

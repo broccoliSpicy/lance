@@ -56,6 +56,7 @@ impl PageScheduler for ValuePageScheduler {
         scheduler: &Arc<dyn EncodingsIo>,
         top_level_row: u64,
     ) -> BoxFuture<'static, Result<Box<dyn PrimitivePageDecoder>>> {
+        println!("ranges: {:?}", ranges.clone());
         let (mut min, mut max) = (u64::MAX, 0);
         let byte_ranges = if self.compression_scheme == CompressionScheme::None {
             ranges

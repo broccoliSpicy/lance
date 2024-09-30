@@ -1204,7 +1204,7 @@ impl BatchDecodeStream {
 
     #[instrument(level = "debug", skip_all)]
     async fn next_batch_task(&mut self) -> Result<Option<NextDecodeTask>> {
-        trace!(
+        println!(
             "Draining batch task (rows_remaining={} rows_drained={} rows_scheduled={})",
             self.rows_remaining,
             self.rows_drained,
@@ -1218,10 +1218,10 @@ impl BatchDecodeStream {
         self.rows_remaining -= to_take;
 
         let scheduled_need = (self.rows_drained + to_take).saturating_sub(self.rows_scheduled);
-        trace!("scheduled_need = {} because rows_drained = {} and to_take = {} and rows_scheduled = {}", scheduled_need, self.rows_drained, to_take, self.rows_scheduled);
+        println!("scheduled_need = {} because rows_drained = {} and to_take = {} and rows_scheduled = {}", scheduled_need, self.rows_drained, to_take, self.rows_scheduled);
         if scheduled_need > 0 {
             let desired_scheduled = scheduled_need + self.rows_scheduled;
-            trace!(
+            println!(
                 "Draining from scheduler (desire at least {} scheduled rows)",
                 desired_scheduled
             );

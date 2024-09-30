@@ -481,8 +481,8 @@ impl LogicalPageDecoder for SimpleStructDecoder {
             .collect::<Result<Vec<_>>>()?;
         let num_rows = child_tasks[0].num_rows;
         let has_more = child_tasks[0].has_more;
-        debug_assert!(child_tasks.iter().all(|task| task.num_rows == num_rows));
-        debug_assert!(child_tasks.iter().all(|task| task.has_more == has_more));
+        assert!(child_tasks.iter().all(|task| task.num_rows == num_rows));
+        assert!(child_tasks.iter().all(|task| task.has_more == has_more));
         Ok(NextDecodeTask {
             task: Box::new(SimpleStructDecodeTask {
                 children: child_tasks,

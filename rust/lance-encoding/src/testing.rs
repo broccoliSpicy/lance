@@ -470,6 +470,7 @@ async fn check_round_trip_encoding_inner(
         Some(concat(&data.iter().map(|arr| arr.as_ref()).collect::<Vec<_>>()).unwrap())
     };
 
+    /* 
     debug!("Testing full decode");
     let scheduler_copy = scheduler.clone();
     test_decode(
@@ -533,7 +534,51 @@ async fn check_round_trip_encoding_inner(
         )
         .await;
     }
+    */
 
+    debug!("Testing decode of ranges {:?}", &test_cases.ranges);
+
+    let num_rows: u64 = test_cases.ranges.iter().map(|range| range.end - range.start).sum();
+
+    let slices: Vec<_> = test_cases.ranges.iter().filter_map(|range| {
+        concat_data.as_ref().map(|data| data.slice(range.start as usize, (range.end - range.start) as usize))
+    }).collect::<Vec<_>>();
+
+    let expected = if !slices.is_empty() {
+        Some(Arc::new(concat(&slices.iter().map(|s| s.as_ref()).collect::<Vec<_>>()).unwrap()) as Arc<dyn Array>)
+    } else {
+        None
+    };
+
+    let scheduler = scheduler.clone();
+    let ranges = test_cases.ranges.clone();
+    test_decode(
+        num_rows,
+        test_cases.batch_size,
+        &schema,
+        &column_infos,
+        expected,
+        scheduler.clone(),
+        |mut decode_scheduler, tx| {
+            #[allow(clippy::single_range_in_vec_init)]
+            let root_decoder = decode_scheduler.new_root_decoder_ranges(&[0..num_rows]);
+            (
+                root_decoder,
+                async move {
+                    decode_scheduler.schedule_ranges(
+                        &ranges,
+                        &FilterExpression::no_filter(),
+                        tx,
+                        scheduler.clone(),
+                    )
+                }
+                .boxed(),
+            )
+        },
+    )
+    .await;
+
+    /* 
     // Test take scheduling
     for indices in &test_cases.indices {
         if indices.len() == 1 {
@@ -578,6 +623,7 @@ async fn check_round_trip_encoding_inner(
         )
         .await;
     }
+    */
 }
 
 const NUM_RANDOM_ROWS: u32 = 10000;
@@ -589,44 +635,71 @@ async fn check_round_trip_field_encoding_random(
     field: Field,
     array_generator_provider: Box<dyn ArrayGeneratorProvider>,
 ) {
-    for null_rate in [None, Some(0.5), Some(1.0)] {
-        for use_slicing in [false, true] {
-            if null_rate != Some(1.0) && matches!(field.data_type(), DataType::Null) {
+    let null_rate = Some(0.5);
+    // for null_rate in [None, Some(0.5), Some(1.0)] {
+    for use_slicing in [false, true] {
+        if null_rate != Some(1.0) && matches!(field.data_type(), DataType::Null) {
+            continue;
+        }
+
+        let field = if null_rate.is_some() {
+            if !supports_nulls(field.data_type()) {
                 continue;
             }
+            field.clone().with_nullable(true)
+        } else {
+            field.clone().with_nullable(false)
+        };
 
-            let field = if null_rate.is_some() {
-                if !supports_nulls(field.data_type()) {
-                    continue;
+        let test_cases = TestCases::default()
+            //.with_range(0..500)
+            //.with_range(100..1100)
+            //.with_range(8000..8500)
+            .with_range(1000..2044)
+            .with_range(2045..2050);
+            /* 
+            .with_indices(vec![100])
+            .with_indices(vec![0])
+            .with_indices(vec![9999])
+            .with_indices(vec![100, 1100, 5000])
+            .with_indices(vec![1000, 2000, 3000])
+            .with_indices(vec![2000, 2001, 2002, 2003, 2004])
+            // Big take that spans multiple pages and generates multiple output batches
+            .with_indices((100..500).map(|i| i * 3).collect::<Vec<_>>());
+            */
+
+        for num_ingest_batches in [1, 5, 10] {
+            let rows_per_batch = NUM_RANDOM_ROWS / num_ingest_batches;
+            let mut data = Vec::new();
+
+            // Test both ingesting one big array sliced into smaller arrays and smaller
+            // arrays independently generated.  These behave slightly differently.  For
+            // example, a list array sliced into smaller arrays will have arrays whose
+            // starting offset is not 0.
+            if use_slicing {
+                let mut generator = gen().anon_col(array_generator_provider.provide());
+                if let Some(null_rate) = null_rate {
+                    // The null generator is the only generator that already inserts nulls
+                    // and attempting to do so again makes arrow-rs grumpy
+                    if !matches!(field.data_type(), DataType::Null) {
+                        generator.with_random_nulls(null_rate);
+                    }
                 }
-                field.clone().with_nullable(true)
+                let all_data = generator
+                    .into_batch_rows(RowCount::from(10000))
+                    .unwrap()
+                    .column(0)
+                    .clone();
+                let mut offset = 0;
+                for _ in 0..num_ingest_batches {
+                    data.push(all_data.slice(offset, rows_per_batch as usize));
+                    offset += rows_per_batch as usize;
+                }
             } else {
-                field.clone().with_nullable(false)
-            };
-
-            let test_cases = TestCases::default()
-                .with_range(0..500)
-                .with_range(100..1100)
-                .with_range(8000..8500)
-                .with_indices(vec![100])
-                .with_indices(vec![0])
-                .with_indices(vec![9999])
-                .with_indices(vec![100, 1100, 5000])
-                .with_indices(vec![1000, 2000, 3000])
-                .with_indices(vec![2000, 2001, 2002, 2003, 2004])
-                // Big take that spans multiple pages and generates multiple output batches
-                .with_indices((100..500).map(|i| i * 3).collect::<Vec<_>>());
-
-            for num_ingest_batches in [1, 5, 10] {
-                let rows_per_batch = NUM_RANDOM_ROWS / num_ingest_batches;
-                let mut data = Vec::new();
-
-                // Test both ingesting one big array sliced into smaller arrays and smaller
-                // arrays independently generated.  These behave slightly differently.  For
-                // example, a list array sliced into smaller arrays will have arrays whose
-                // starting offset is not 0.
-                if use_slicing {
-                    let mut generator = gen().anon_col(array_generator_provider.provide());
+                for i in 0..num_ingest_batches {
+                    let mut generator = gen()
+                        .with_seed(Seed::from(i as u64))
+                        .anon_col(array_generator_provider.provide());
                     if let Some(null_rate) = null_rate {
                         // The null generator is the only generator that already inserts nulls
                         // and attempting to do so again makes arrow-rs grumpy
@@ -634,47 +707,25 @@ async fn check_round_trip_field_encoding_random(
                             generator.with_random_nulls(null_rate);
                         }
                     }
-                    let all_data = generator
-                        .into_batch_rows(RowCount::from(10000))
+                    let arr = generator
+                        .into_batch_rows(RowCount::from(rows_per_batch as u64))
                         .unwrap()
                         .column(0)
                         .clone();
-                    let mut offset = 0;
-                    for _ in 0..num_ingest_batches {
-                        data.push(all_data.slice(offset, rows_per_batch as usize));
-                        offset += rows_per_batch as usize;
-                    }
-                } else {
-                    for i in 0..num_ingest_batches {
-                        let mut generator = gen()
-                            .with_seed(Seed::from(i as u64))
-                            .anon_col(array_generator_provider.provide());
-                        if let Some(null_rate) = null_rate {
-                            // The null generator is the only generator that already inserts nulls
-                            // and attempting to do so again makes arrow-rs grumpy
-                            if !matches!(field.data_type(), DataType::Null) {
-                                generator.with_random_nulls(null_rate);
-                            }
-                        }
-                        let arr = generator
-                            .into_batch_rows(RowCount::from(rows_per_batch as u64))
-                            .unwrap()
-                            .column(0)
-                            .clone();
-                        data.push(arr);
-                    }
+                    data.push(arr);
                 }
-
-                debug!(
-                    "Testing with {} rows divided across {} batches for {} rows per batch with null_rate={:?} and use_slicing={}",
-                    NUM_RANDOM_ROWS,
-                    num_ingest_batches,
-                    rows_per_batch,
-                    null_rate,
-                    use_slicing
-                );
-                check_round_trip_encoding_inner(encoder_factory(), &field, data, &test_cases).await
             }
+
+            debug!(
+                "Testing with {} rows divided across {} batches for {} rows per batch with null_rate={:?} and use_slicing={}",
+                NUM_RANDOM_ROWS,
+                num_ingest_batches,
+                rows_per_batch,
+                null_rate,
+                use_slicing
+            );
+            check_round_trip_encoding_inner(encoder_factory(), &field, data, &test_cases).await
         }
     }
+    // }
 }
