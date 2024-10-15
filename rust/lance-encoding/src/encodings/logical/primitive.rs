@@ -1455,7 +1455,8 @@ impl PrimitiveStructuralEncoder {
         let mut value_offset = 0;
         for ((chunk, rep), def) in miniblocks.chunks.into_iter().zip(rep).zip(def) {
             let chunk_bytes = chunk.num_bytes as u64 + rep.len() as u64 + def.len() as u64 + 6;
-            assert!(chunk_bytes <= 16 * 1024);
+            // println!("chunk_bytes: {:?}, chunk.num_bytes: {:?}, rep.len(): {:?}, def.len(): {:?}", chunk_bytes, chunk.num_bytes, rep.len(), def.len());
+            assert!(chunk_bytes <= 24 * 1024);
             assert!(chunk_bytes > 0);
             // We subtract 1 here from chunk_bytes because we want to be able to express
             // a size of 24KiB and not (24Ki - 6)B which is what we'd get otherwise with

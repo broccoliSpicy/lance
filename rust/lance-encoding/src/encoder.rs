@@ -19,7 +19,7 @@ use crate::encodings::logical::blob::{BlobFieldEncoder, DESC_FIELD};
 use crate::encodings::logical::primitive::PrimitiveStructuralEncoder;
 use crate::encodings::logical::r#struct::StructFieldEncoder;
 use crate::encodings::logical::r#struct::StructStructuralEncoder;
-use crate::encodings::physical::bitpack_fastlanes::compute_compressed_bit_width_for_non_neg;
+use crate::encodings::physical::bitpack_fastlanes::{compute_compressed_bit_width_for_non_neg, BitpackMiniBlockEncoder};
 use crate::encodings::physical::bitpack_fastlanes::BitpackedForNonNegArrayEncoder;
 use crate::encodings::physical::block_compress::CompressionScheme;
 use crate::encodings::physical::dictionary::AlreadyDictionaryEncoder;
@@ -768,8 +768,11 @@ impl CompressionStrategy for CoreArrayEncodingStrategy {
         field: &Field,
         _data: &DataBlock,
     ) -> Result<Box<dyn MiniBlockCompressor>> {
+        /* 
         assert!(field.data_type().byte_width() > 0);
         Ok(Box::new(ValueEncoder::default()))
+        */
+        Ok(Box::new(BitpackMiniBlockEncoder::default()))
     }
 
     fn create_fixed_per_value(

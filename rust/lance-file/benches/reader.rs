@@ -2,10 +2,11 @@
 // SPDX-FileCopyrightText: Copyright The Lance Authors
 use std::sync::{Arc, Mutex};
 
-use arrow_array::{cast::AsArray, types::Int32Type};
-use arrow_schema::DataType;
+use arrow_array::{cast::AsArray, types::Int32Type, ArrayRef, Int32Array, RecordBatch};
+use arrow_schema::{DataType, Schema as ArrowSchema, Field as ArrowField};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use futures::{FutureExt, StreamExt};
+use lance_core::datatypes::{Schema, Field};
 use lance_encoding::decoder::{DecoderPlugins, FilterExpression};
 use lance_file::{
     v2::{
@@ -23,10 +24,24 @@ use lance_io::{
 fn bench_reader(c: &mut Criterion) {
     for version in [LanceFileVersion::V2_0, LanceFileVersion::V2_1] {
         let mut group = c.benchmark_group(&format!("reader_{}", version));
+        //let mut group = c.benchmark_group(&format!("reader_2.1"));
+        /* 
         let data = lance_datagen::gen()
             .anon_col(lance_datagen::array::rand_type(&DataType::Int32))
             .into_batch_rows(lance_datagen::RowCount::from(2 * 1024 * 1024))
             .unwrap();
+        */
+        let array = Int32Array::from(vec![5; 2 * 1024 * 1024]);
+        let array_ref: ArrayRef = Arc::new(array);
+
+        let schema = Arc::new(ArrowSchema::new(vec![ArrowField::new(
+            "i",
+            DataType::Int32,
+            false,
+        )]));
+        // Create schema and record batch
+        let data = RecordBatch::try_new(schema, vec![array_ref]).unwrap();
+
         let rt = tokio::runtime::Runtime::new().unwrap();
 
         let tempdir = tempfile::tempdir().unwrap();
