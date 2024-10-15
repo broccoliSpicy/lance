@@ -402,6 +402,8 @@ impl BlockDecompressor for ValueDecompressor {
             bits_per_value: self.bytes_per_value * 8,
             data,
             num_values,
+            block_info: BlockInfo::new(),
+            used_encoding: UsedEncoding::new(),
         }))
     }
 }
@@ -414,6 +416,8 @@ impl MiniBlockDecompressor for ValueDecompressor {
             data,
             bits_per_value: self.bytes_per_value * 8,
             num_values,
+            block_info: BlockInfo::new(),
+            used_encoding: UsedEncoding::new(),
         }))
     }
 }

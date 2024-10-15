@@ -78,17 +78,11 @@ fn bench_reader(c: &mut Criterion) {
                             FilterExpression::no_filter(),
                         )
                         .unwrap();
-                    let stats = Arc::new(Mutex::new((0, 0, 0, Vec::with_capacity(1024 * 1024))));
+                    let stats = Arc::new(Mutex::new((0, 0)));
                     let mut stream = stream
                         .map(|batch_task| {
                             let stats = stats.clone();
                             async move {
-                                {
-                                    let mut stats = stats.lock().unwrap();
-                                    let concurrent_task_count = stats.2 + 1;
-                                    stats.2 = concurrent_task_count;
-                                    stats.3.push(concurrent_task_count);
-                                };
                                 let batch = batch_task.task.await.unwrap();
                                 let row_count = batch.num_rows();
                                 let sum = batch
@@ -101,7 +95,6 @@ fn bench_reader(c: &mut Criterion) {
                                 let mut stats = stats.lock().unwrap();
                                 stats.0 += row_count;
                                 stats.1 += sum;
-                                stats.2 -= 1;
                             }
                             .boxed()
                         })
@@ -110,10 +103,7 @@ fn bench_reader(c: &mut Criterion) {
                     let stats = stats.lock().unwrap();
                     let row_count = stats.0;
                     let sum = stats.1;
-                    let curr_task_count = stats.2;
-                    let curr_counts = stats.3.clone();
                     assert_eq!(data.num_rows(), row_count);
-                    assert_eq!(curr_task_count, 0);
                     black_box(sum);
                 });
             })

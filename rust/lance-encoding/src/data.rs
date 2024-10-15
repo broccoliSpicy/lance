@@ -324,6 +324,8 @@ impl DataBlockBuilderImpl for FixedWidthDataBlockBuilder {
             data: LanceBuffer::Owned(self.values),
             bits_per_value: self.bits_per_value,
             num_values,
+            block_info: BlockInfo::new(),
+            used_encoding: UsedEncoding::new(),
         })
     }
 }
