@@ -412,7 +412,6 @@ impl BlockDecompressor for ValueDecompressor {
 impl MiniBlockDecompressor for ValueDecompressor {
     fn decompress(&self, data: LanceBuffer, num_values: u64) -> Result<DataBlock> {
         debug_assert!(data.len() as u64 >= num_values * self.bytes_per_value);
-        println!("inside ValueDecompressor::decompress");
 
         Ok(DataBlock::FixedWidth(FixedWidthDataBlock {
             data,
