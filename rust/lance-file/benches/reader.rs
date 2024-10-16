@@ -6,7 +6,6 @@ use arrow_array::{cast::AsArray, types::Int32Type, ArrayRef, Int32Array, RecordB
 use arrow_schema::{DataType, Schema as ArrowSchema, Field as ArrowField};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use futures::{FutureExt, StreamExt};
-use lance_core::datatypes::{Schema, Field};
 use lance_encoding::decoder::{DecoderPlugins, FilterExpression};
 use lance_file::{
     v2::{
@@ -31,7 +30,7 @@ fn bench_reader(c: &mut Criterion) {
             .into_batch_rows(lance_datagen::RowCount::from(2 * 1024 * 1024))
             .unwrap();
         */
-        let array = Int32Array::from(vec![5; 2 * 1024 * 1024]);
+        let array = Int32Array::from(vec![5; 16 * 1024 * 1024]);
         let array_ref: ArrayRef = Arc::new(array);
 
         let schema = Arc::new(ArrowSchema::new(vec![ArrowField::new(

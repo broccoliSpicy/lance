@@ -341,7 +341,7 @@ impl DecodePageTask for DecodeMiniBlockTask {
             .iter()
             .map(|chunk| chunk.data.len())
             .sum::<usize>()
-            * 2;
+            * 64;
         let mut data_builder =
             DataBlockBuilder::with_capacity_estimate(estimated_size_bytes as u64);
         for chunk in self.chunks.into_iter() {
@@ -589,6 +589,7 @@ impl StructuralPageScheduler for MiniBlockScheduler {
                 // Might be empty if entire chunk is skipped
                 if !range.is_empty() {
                     if !current_scheduled_chunk.ranges.is_empty() {
+                        // println!("current_scheduled_chunk: {:?}", current_scheduled_chunk);
                         scheduled_chunks.push_back(current_scheduled_chunk);
                         ranges_to_req.push(
                             (self.data_buf_position + bytes_offset)
@@ -1573,6 +1574,7 @@ impl PrimitiveStructuralEncoder {
         // The validity is encoded in repdef so we can remove it
         let data = data.remove_validity();
 
+        // println!("inside encode_miniblock: num_values: {:?}", num_values);
         let compressor = compression_strategy.create_miniblock_compressor(field, &data)?;
         let (compressed_data, value_encoding) = compressor.compress(data)?;
 

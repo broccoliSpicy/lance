@@ -1571,7 +1571,6 @@ impl BitpackMiniBlockEncoder {
         debug_assert!(data.bits_per_value % 8 == 0);
 
         let bit_width_array = data.get_stat(Stat::BitWidth).expect("FixedWidthDataBlock should have valid Stat::BitWidht statistics");
-        println!("bit_width: {:?}", bit_width_array);
         let bit_width_array = bit_width_array.as_any().downcast_ref::<UInt64Array>().expect("Expected a UInt64Array");
         let compressed_bit_width = bit_width_array.value(0);
 
@@ -1582,144 +1581,10 @@ impl BitpackMiniBlockEncoder {
 
         match data.bits_per_value {
             8 => {
-                let u8_slice_ref = data.data.borrow_to_typed_slice::<u8>();
-                let data_buffer = u8_slice_ref.as_ref();
-
-                let uncompressed_bit_width = data.bits_per_value;
-
-                // the output vector type is the same as the input type, for example, when input is u16, output is Vec<u16>
-                let packed_chunk_size = 1024 * compressed_bit_width as usize / uncompressed_bit_width as usize;
-
-                let mut output = Vec::with_capacity(num_chunks as usize * packed_chunk_size);
-
-                let log_vals_per_chunk= 10;
-
-                let mut chunks = Vec::with_capacity(num_chunks as usize);
-
-                // Loop over all but the last chunk.
-                (0..num_full_chunks).for_each(|i| {
-                    let start_elem = (i * ELEMS_PER_CHUNK) as usize;
-
-                    let output_len = output.len();
-                    unsafe {
-                        output.set_len(output_len + packed_chunk_size);
-                        BitPacking::unchecked_pack(
-                            compressed_bit_width as usize,
-                            &data_buffer[start_elem..][..ELEMS_PER_CHUNK as usize],
-                            &mut output[output_len..][..packed_chunk_size],
-                        );
-                    }
-                    chunks.push(MiniBlockChunk {
-                        num_bytes: bytes_per_chunk as u16,
-                        log_num_values: log_vals_per_chunk as u8,
-                    });
-                });
-
-                if num_chunks != num_full_chunks {
-                    let last_chunk_elem_num = data.num_values % ELEMS_PER_CHUNK;
-                    let mut last_chunk = vec![0; ELEMS_PER_CHUNK as usize];
-                    last_chunk[..last_chunk_elem_num as usize].clone_from_slice(
-                        &data_buffer[data.num_values as usize - last_chunk_elem_num as usize..],
-                    );
-
-                    let output_len = output.len();
-                    unsafe {
-                        output.set_len(output_len + packed_chunk_size);
-                        BitPacking::unchecked_pack(
-                            compressed_bit_width as usize,
-                            &last_chunk,
-                            &mut output[output_len..][..packed_chunk_size],
-                        );
-                    }
-                    chunks.push(MiniBlockChunk {
-                        num_bytes: bytes_per_chunk as u16,
-                        log_num_values: log_vals_per_chunk as u8,
-                    });
-                }
-                (
-                MiniBlockCompressed {
-                    data: LanceBuffer::reinterpret_vec(output),
-                    chunks,
-                    num_values: data.num_values,
-                },
-                ProtobufUtils::bitpacked_for_non_neg_encoding(
-                    compressed_bit_width,
-                    uncompressed_bit_width,
-                    0,
-                )
-
-                )
-
+                unreachable!();
             }
             16 => {
-                let u16_slice_ref = data.data.borrow_to_typed_slice::<u16>();
-                let data_buffer = u16_slice_ref.as_ref();
-
-                let uncompressed_bit_width = data.bits_per_value;
-
-                // the output vector type is the same as the input type, for example, when input is u16, output is Vec<u16>
-                let packed_chunk_size = 1024 * compressed_bit_width as usize / uncompressed_bit_width as usize;
-
-                let mut output = Vec::with_capacity(num_chunks as usize * packed_chunk_size);
-
-                let (log_vals_per_chunk, vals_per_chunk) = (10, 1024);
-
-                let mut chunks = Vec::with_capacity(num_chunks as usize);
-
-                // Loop over all but the last chunk.
-                (0..num_full_chunks).for_each(|i| {
-                    let start_elem = (i * ELEMS_PER_CHUNK) as usize;
-
-                    let output_len = output.len();
-                    unsafe {
-                        output.set_len(output_len + packed_chunk_size);
-                        BitPacking::unchecked_pack(
-                            compressed_bit_width as usize,
-                            &data_buffer[start_elem..][..ELEMS_PER_CHUNK as usize],
-                            &mut output[output_len..][..packed_chunk_size],
-                        );
-                    }
-                    chunks.push(MiniBlockChunk {
-                        num_bytes: bytes_per_chunk as u16,
-                        log_num_values: log_vals_per_chunk as u8,
-                    });
-                });
-
-                if num_chunks != num_full_chunks {
-                    let last_chunk_elem_num = data.num_values % ELEMS_PER_CHUNK;
-                    let mut last_chunk = vec![0; ELEMS_PER_CHUNK as usize];
-                    last_chunk[..last_chunk_elem_num as usize].clone_from_slice(
-                        &data_buffer[data.num_values as usize - last_chunk_elem_num as usize..],
-                    );
-
-                    let output_len = output.len();
-                    unsafe {
-                        output.set_len(output_len + packed_chunk_size);
-                        BitPacking::unchecked_pack(
-                            compressed_bit_width as usize,
-                            &last_chunk,
-                            &mut output[output_len..][..packed_chunk_size],
-                        );
-                    }
-                    chunks.push(MiniBlockChunk {
-                        num_bytes: bytes_per_chunk as u16,
-                        log_num_values: log_vals_per_chunk as u8,
-                    });
-                }
-                (
-                MiniBlockCompressed {
-                    data: LanceBuffer::reinterpret_vec(output),
-                    chunks,
-                    num_values: data.num_values,
-                },
-                ProtobufUtils::bitpacked_for_non_neg_encoding(
-                    compressed_bit_width,
-                    uncompressed_bit_width,
-                    0,
-                )
-
-                )
-
+                unreachable!();
             }
             32 => {
                 let u32_slice_ref = data.data.borrow_to_typed_slice::<u32>();
@@ -1732,7 +1597,7 @@ impl BitpackMiniBlockEncoder {
 
                 let mut output = Vec::with_capacity(num_chunks as usize * packed_chunk_size);
 
-                let (log_vals_per_chunk, vals_per_chunk) = (10, 1024);
+                let log_vals_per_chunk = 10;
 
                 let mut chunks = Vec::with_capacity(num_chunks as usize);
 
@@ -1791,73 +1656,7 @@ impl BitpackMiniBlockEncoder {
                 )
             }
             64 => {
-                let u64_slice_ref = data.data.borrow_to_typed_slice::<u64>();
-                let data_buffer = u64_slice_ref.as_ref();
-
-                let uncompressed_bit_width = data.bits_per_value;
-
-                // the output vector type is the same as the input type, for example, when input is u16, output is Vec<u16>
-                let packed_chunk_size = 1024 * compressed_bit_width as usize / uncompressed_bit_width as usize;
-
-                let mut output = Vec::with_capacity(num_chunks as usize * packed_chunk_size);
-
-                let (log_vals_per_chunk, vals_per_chunk) = (10, 1024);
-
-                let mut chunks = Vec::with_capacity(num_chunks as usize);
-
-                // Loop over all but the last chunk.
-                (0..num_full_chunks).for_each(|i| {
-                    let start_elem = (i * ELEMS_PER_CHUNK) as usize;
-
-                    let output_len = output.len();
-                    unsafe {
-                        output.set_len(output_len + packed_chunk_size);
-                        BitPacking::unchecked_pack(
-                            compressed_bit_width as usize,
-                            &data_buffer[start_elem..][..ELEMS_PER_CHUNK as usize],
-                            &mut output[output_len..][..packed_chunk_size],
-                        );
-                    }
-                    chunks.push(MiniBlockChunk {
-                        num_bytes: bytes_per_chunk as u16,
-                        log_num_values: log_vals_per_chunk as u8,
-                    });
-                });
-
-                if num_chunks != num_full_chunks {
-                    let last_chunk_elem_num = data.num_values % ELEMS_PER_CHUNK;
-                    let mut last_chunk = vec![0; ELEMS_PER_CHUNK as usize];
-                    last_chunk[..last_chunk_elem_num as usize].clone_from_slice(
-                        &data_buffer[data.num_values as usize - last_chunk_elem_num as usize..],
-                    );
-
-                    let output_len = output.len();
-                    unsafe {
-                        output.set_len(output_len + packed_chunk_size);
-                        BitPacking::unchecked_pack(
-                            compressed_bit_width as usize,
-                            &last_chunk,
-                            &mut output[output_len..][..packed_chunk_size],
-                        );
-                    }
-                    chunks.push(MiniBlockChunk {
-                        num_bytes: bytes_per_chunk as u16,
-                        log_num_values: log_vals_per_chunk as u8,
-                    });
-                }
-                (
-                MiniBlockCompressed {
-                    data: LanceBuffer::reinterpret_vec(output),
-                    chunks,
-                    num_values: data.num_values,
-                },
-                ProtobufUtils::bitpacked_for_non_neg_encoding(
-                    compressed_bit_width,
-                    uncompressed_bit_width,
-                    0,
-                )
-
-                )
+                unreachable!();
             }
             _ => {
                 unreachable!();
@@ -1903,180 +1702,40 @@ impl BitpackMiniBlockDecompressor {
 
 impl MiniBlockDecompressor for BitpackMiniBlockDecompressor {
     fn decompress(&self, data: LanceBuffer, num_values: u64) -> Result<DataBlock> {
-        //println!("inside BitpackMiniBlockDecompressor::decompress");
+        // println!("data.len(): {:?}, num_values: {:?}", data.len(), num_values);
+        assert!(data.len() == (self.compressed_bits_per_value * ELEMS_PER_CHUNK) as usize / 8);
+        assert!(num_values <= ELEMS_PER_CHUNK);
         match self.uncompressed_bits_per_value {
             8 => {
-                let mut decompressed: Vec<u8> = Vec::with_capacity(num_values as usize);
-                let packed_chunk_size_in_byte: usize = (ELEMS_PER_CHUNK * self.compressed_bits_per_value) as usize / 8;
-                let mut decompress_chunk_buf = vec![0u8; ELEMS_PER_CHUNK as usize];
-                let mut i = 0usize;
-                while i < (num_values / ELEMS_PER_CHUNK) as usize {
-                    // Copy for memory alignment
-                    let chunk_in_u8: Vec<u8> = data[i * packed_chunk_size_in_byte..]
-                        [..packed_chunk_size_in_byte]
-                        .to_vec();
-                    let chunk = cast_slice(&chunk_in_u8);
-                    unsafe {
-                        BitPacking::unchecked_unpack(
-                            self.compressed_bits_per_value as usize,
-                            chunk,
-                            &mut decompress_chunk_buf,
-                        );
-                    }
-                    decompressed.extend_from_slice(&decompress_chunk_buf);
-                    i += 1;
-                }
-                if num_values % ELEMS_PER_CHUNK != 0 {
-                    let chunk_in_u8: Vec<u8> = data[i * packed_chunk_size_in_byte..]
-                        [..packed_chunk_size_in_byte]
-                        .to_vec();
-                    let chunk = cast_slice(&chunk_in_u8);
-                    unsafe {
-                        BitPacking::unchecked_unpack(
-                            self.compressed_bits_per_value as usize,
-                            chunk,
-                            &mut decompress_chunk_buf,
-                        );
-                    }
-                    decompressed.extend_from_slice(&decompress_chunk_buf[0..(num_values % ELEMS_PER_CHUNK) as usize]);
-                }
-                Ok(DataBlock::FixedWidth(FixedWidthDataBlock {
-                    data: LanceBuffer::reinterpret_vec(decompressed),
-                    bits_per_value: 8,
-                    num_values: num_values,
-                    block_info: BlockInfo::new(),
-                    used_encoding: UsedEncoding::new(),
-                }))
+                unreachable!();
             }
             16 => {
-                let mut decompressed: Vec<u16> = Vec::with_capacity(num_values as usize);
-                let packed_chunk_size_in_byte: usize = (ELEMS_PER_CHUNK * self.compressed_bits_per_value) as usize / 8;
-                let mut decompress_chunk_buf = vec![0u16; ELEMS_PER_CHUNK as usize];
-                let mut i = 0usize;
-                while i < (num_values / ELEMS_PER_CHUNK) as usize {
-                    // Copy for memory alignment
-                    let chunk_in_u8: Vec<u8> = data[i * packed_chunk_size_in_byte..]
-                        [..packed_chunk_size_in_byte]
-                        .to_vec();
-                    let chunk = cast_slice(&chunk_in_u8);
-                    unsafe {
-                        BitPacking::unchecked_unpack(
-                            self.compressed_bits_per_value as usize,
-                            chunk,
-                            &mut decompress_chunk_buf,
-                        );
-                    }
-                    decompressed.extend_from_slice(&decompress_chunk_buf);
-                    i += 1;
-                }
-                if num_values % ELEMS_PER_CHUNK != 0 {
-                    let chunk_in_u8: Vec<u8> = data[i * packed_chunk_size_in_byte..]
-                        [..packed_chunk_size_in_byte]
-                        .to_vec();
-                    let chunk = cast_slice(&chunk_in_u8);
-                    unsafe {
-                        BitPacking::unchecked_unpack(
-                            self.compressed_bits_per_value as usize,
-                            chunk,
-                            &mut decompress_chunk_buf,
-                        );
-                    }
-                    decompressed.extend_from_slice(&decompress_chunk_buf[0..(num_values % ELEMS_PER_CHUNK) as usize]);
-                }
-                Ok(DataBlock::FixedWidth(FixedWidthDataBlock {
-                    data: LanceBuffer::reinterpret_vec(decompressed),
-                    bits_per_value: 8,
-                    num_values: num_values,
-                    block_info: BlockInfo::new(),
-                    used_encoding: UsedEncoding::new(),
-                }))
+                unreachable!();
             }
             32 => {
-                println!("data.len(): {}, num_values: {}", data.len(), num_values);
-                let mut decompressed: Vec<u32> = Vec::with_capacity(num_values as usize);
-                let packed_chunk_size_in_byte: usize = (ELEMS_PER_CHUNK * self.compressed_bits_per_value) as usize / 8;
-                let mut decompress_chunk_buf = vec![0u32; ELEMS_PER_CHUNK as usize];
-                let mut i = 0usize;
-                while i < (num_values / ELEMS_PER_CHUNK) as usize {
-                    // Copy for memory alignment
-                    let chunk_in_u8: Vec<u8> = data[i * packed_chunk_size_in_byte..]
-                        [..packed_chunk_size_in_byte]
-                        .to_vec();
-                    let chunk = cast_slice(&chunk_in_u8);
-                    unsafe {
-                        BitPacking::unchecked_unpack(
-                            self.compressed_bits_per_value as usize,
-                            chunk,
-                            &mut decompress_chunk_buf,
-                        );
-                    }
-                    decompressed.extend_from_slice(&decompress_chunk_buf);
-                    i += 1;
+                let mut decompressed= vec![0u32; ELEMS_PER_CHUNK as usize];
+                // Copy for memory alignment
+                let chunk_in_u8: Vec<u8> = data
+                    .to_vec();
+                let chunk = cast_slice(&chunk_in_u8);
+                unsafe {
+                    BitPacking::unchecked_unpack(
+                        self.compressed_bits_per_value as usize,
+                        chunk,
+                        &mut decompressed,
+                    );
                 }
-                if num_values % ELEMS_PER_CHUNK != 0 {
-                    let chunk_in_u8: Vec<u8> = data[i * packed_chunk_size_in_byte..]
-                        [..packed_chunk_size_in_byte]
-                        .to_vec();
-                    let chunk = cast_slice(&chunk_in_u8);
-                    unsafe {
-                        BitPacking::unchecked_unpack(
-                            self.compressed_bits_per_value as usize,
-                            chunk,
-                            &mut decompress_chunk_buf,
-                        );
-                    }
-                    decompressed.extend_from_slice(&decompress_chunk_buf[0..(num_values % ELEMS_PER_CHUNK) as usize]);
-                }
+                decompressed.shrink_to(num_values as usize);
                 Ok(DataBlock::FixedWidth(FixedWidthDataBlock {
                     data: LanceBuffer::reinterpret_vec(decompressed),
-                    bits_per_value: 8,
+                    bits_per_value: 32,
                     num_values: num_values,
                     block_info: BlockInfo::new(),
                     used_encoding: UsedEncoding::new(),
                 }))
             }
             64 => {
-                let mut decompressed: Vec<u64> = Vec::with_capacity(num_values as usize);
-                let packed_chunk_size_in_byte: usize = (ELEMS_PER_CHUNK * self.compressed_bits_per_value) as usize / 8;
-                let mut decompress_chunk_buf = vec![0u64; ELEMS_PER_CHUNK as usize];
-                let mut i = 0usize;
-                while i < (num_values / ELEMS_PER_CHUNK) as usize {
-                    // Copy for memory alignment
-                    let chunk_in_u8: Vec<u8> = data[i * packed_chunk_size_in_byte..]
-                        [..packed_chunk_size_in_byte]
-                        .to_vec();
-                    let chunk = cast_slice(&chunk_in_u8);
-                    unsafe {
-                        BitPacking::unchecked_unpack(
-                            self.compressed_bits_per_value as usize,
-                            chunk,
-                            &mut decompress_chunk_buf,
-                        );
-                    }
-                    decompressed.extend_from_slice(&decompress_chunk_buf);
-                    i += 1;
-                }
-                if num_values % ELEMS_PER_CHUNK != 0 {
-                    let chunk_in_u8: Vec<u8> = data[i * packed_chunk_size_in_byte..]
-                        [..packed_chunk_size_in_byte]
-                        .to_vec();
-                    let chunk = cast_slice(&chunk_in_u8);
-                    unsafe {
-                        BitPacking::unchecked_unpack(
-                            self.compressed_bits_per_value as usize,
-                            chunk,
-                            &mut decompress_chunk_buf,
-                        );
-                    }
-                    decompressed.extend_from_slice(&decompress_chunk_buf[0..(num_values % ELEMS_PER_CHUNK) as usize]);
-                }
-                Ok(DataBlock::FixedWidth(FixedWidthDataBlock {
-                    data: LanceBuffer::reinterpret_vec(decompressed),
-                    bits_per_value: 8,
-                    num_values: num_values,
-                    block_info: BlockInfo::new(),
-                    used_encoding: UsedEncoding::new(),
-                }))
+                unreachable!();
             }
             _ => {
                 unreachable!();
