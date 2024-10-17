@@ -1587,8 +1587,11 @@ impl BitpackMiniBlockEncoder {
                 unreachable!();
             }
             32 => {
-                let u32_slice_ref = data.data.borrow_to_typed_slice::<u32>();
-                let data_buffer = u32_slice_ref.as_ref();
+                unreachable!();
+            }
+            64 => {
+                let u64_slice_ref = data.data.borrow_to_typed_slice::<u64>();
+                let data_buffer = u64_slice_ref.as_ref();
 
                 let uncompressed_bit_width = data.bits_per_value;
 
@@ -1638,8 +1641,10 @@ impl BitpackMiniBlockEncoder {
                     }
                     chunks.push(MiniBlockChunk {
                         num_bytes: bytes_per_chunk as u16,
-                        log_num_values: log_vals_per_chunk as u8,
+                        log_num_values: 0,
                     });
+                } else {
+                    chunks.last_mut().unwrap().log_num_values = 0;
                 }
                 (
                 MiniBlockCompressed {
@@ -1654,9 +1659,6 @@ impl BitpackMiniBlockEncoder {
                 )
 
                 )
-            }
-            64 => {
-                unreachable!();
             }
             _ => {
                 unreachable!();
@@ -1702,7 +1704,8 @@ impl BitpackMiniBlockDecompressor {
 
 impl MiniBlockDecompressor for BitpackMiniBlockDecompressor {
     fn decompress(&self, data: LanceBuffer, num_values: u64) -> Result<DataBlock> {
-        // println!("data.len(): {:?}, num_values: {:?}", data.len(), num_values);
+        println!("data.len(): {:?}, num_values: {:?}, self.compressed_bits_per_value: {:?}", data.len(), num_values, self.compressed_bits_per_value);
+        
         assert!(data.len() == (self.compressed_bits_per_value * ELEMS_PER_CHUNK) as usize / 8);
         assert!(num_values <= ELEMS_PER_CHUNK);
         match self.uncompressed_bits_per_value {
@@ -1713,7 +1716,10 @@ impl MiniBlockDecompressor for BitpackMiniBlockDecompressor {
                 unreachable!();
             }
             32 => {
-                let mut decompressed= vec![0u32; ELEMS_PER_CHUNK as usize];
+                unreachable!();
+            }
+            64 => {
+                let mut decompressed= vec![0u64; ELEMS_PER_CHUNK as usize];
                 // Copy for memory alignment
                 let chunk_in_u8: Vec<u8> = data
                     .to_vec();
@@ -1728,14 +1734,11 @@ impl MiniBlockDecompressor for BitpackMiniBlockDecompressor {
                 decompressed.shrink_to(num_values as usize);
                 Ok(DataBlock::FixedWidth(FixedWidthDataBlock {
                     data: LanceBuffer::reinterpret_vec(decompressed),
-                    bits_per_value: 32,
+                    bits_per_value: 64,
                     num_values: num_values,
                     block_info: BlockInfo::new(),
                     used_encoding: UsedEncoding::new(),
                 }))
-            }
-            64 => {
-                unreachable!();
             }
             _ => {
                 unreachable!();
