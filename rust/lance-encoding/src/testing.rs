@@ -318,6 +318,7 @@ pub struct TestCases {
     batch_size: u32,
     skip_validation: bool,
     max_page_size: Option<u64>,
+    page_sizes: Vec<u64>,
     file_version: LanceFileVersion,
     verify_encoding: Option<Arc<EncodingVerificationFn>>,
 }
@@ -330,6 +331,7 @@ impl Default for TestCases {
             indices: Vec::new(),
             skip_validation: false,
             max_page_size: None,
+            page_sizes: vec![4096, 1024 * 1024],
             file_version: LanceFileVersion::default(),
             verify_encoding: None,
         }
@@ -359,6 +361,11 @@ impl TestCases {
 
     pub fn with_file_version(mut self, version: LanceFileVersion) -> Self {
         self.file_version = version;
+        self
+    }
+
+    pub fn with_page_sizes(mut self, page_sizes: Vec<u64>) -> Self {
+        self.page_sizes = page_sizes;
         self
     }
 
@@ -398,11 +405,11 @@ pub async fn check_round_trip_encoding_of_data(
     let mut field = Field::new("", example_data.data_type().clone(), true);
     field = field.with_metadata(metadata);
     let lance_field = lance_core::datatypes::Field::try_from(&field).unwrap();
-    for page_size in [4096, 1024 * 1024] {
+    for page_size in test_cases.page_sizes.iter() {
         let encoding_strategy = default_encoding_strategy(test_cases.file_version);
         let mut column_index_seq = ColumnIndexSequence::default();
         let encoding_options = EncodingOptions {
-            cache_bytes_per_column: page_size,
+            cache_bytes_per_column: *page_size,
             max_page_bytes: test_cases.get_max_page_size(),
             keep_original_array: true,
         };

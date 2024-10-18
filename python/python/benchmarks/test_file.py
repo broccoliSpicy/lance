@@ -43,7 +43,7 @@ def test_scan_integer(tmp_path: Path, benchmark, version):
 
     result = benchmark.pedantic(read_all, rounds=1, iterations=1)
 
-    # assert result.num_rows == NUM_ROWS
+    assert result.num_rows == NUM_ROWS
 
 
 @pytest.mark.parametrize(
@@ -80,7 +80,7 @@ def test_scan_nullable_integer(tmp_path: Path, benchmark, version):
 
     result = benchmark.pedantic(read_all, rounds=1, iterations=1)
 
-    # assert result.num_rows == NUM_ROWS
+    assert result.num_rows == NUM_ROWS
 
 
 @pytest.mark.benchmark(group="scan_single_column")
@@ -129,7 +129,7 @@ def test_scan_nested_integer(tmp_path: Path, benchmark):
 
     result = benchmark.pedantic(read_all, rounds=1, iterations=1)
 
-    # assert result.num_rows == NUM_ROWS
+    assert result.num_rows == NUM_ROWS
 
 
 @pytest.mark.parametrize(
@@ -166,7 +166,7 @@ def test_sample_integer(tmp_path: Path, benchmark, version):
 
     result = benchmark.pedantic(sample, rounds=30, iterations=1)
 
-    # assert result.num_rows == NUM_ROWS
+    assert result.num_rows == NUM_ROWS
 
 
 @pytest.mark.benchmark(group="sample_single_column")
@@ -217,4 +217,4 @@ def test_sample_nested_integer(tmp_path: Path, benchmark):
 
     result = benchmark.pedantic(sample, rounds=30, iterations=1)
 
-    # assert result.num_rows == NUM_ROWS
+    assert result.num_rows == NUM_ROWS

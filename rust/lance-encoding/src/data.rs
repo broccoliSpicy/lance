@@ -308,14 +308,12 @@ impl FixedWidthDataBlockBuilder {
 }
 
 impl DataBlockBuilderImpl for FixedWidthDataBlockBuilder {
-    fn append(&mut self, data_block: DataBlock, selection: &[Range<u64>]) {
-        let block = data_block.as_fixed_width().unwrap();
+    fn append(&mut self, data_block: &DataBlock, selection: Range<u64>) {
+        let block = data_block.as_fixed_width_ref().unwrap();
         assert_eq!(self.bits_per_value, block.bits_per_value);
-        for rng in selection {
-            let start = rng.start as usize * self.bytes_per_value as usize;
-            let end = rng.end as usize * self.bytes_per_value as usize;
-            self.values.extend_from_slice(&block.data[start..end]);
-        }
+        let start = selection.start as usize * self.bytes_per_value as usize;
+        let end = selection.end as usize * self.bytes_per_value as usize;
+        self.values.extend_from_slice(&block.data[start..end]);
     }
 
     fn finish(self: Box<Self>) -> DataBlock {
@@ -868,6 +866,17 @@ macro_rules! as_type {
     };
 }
 
+macro_rules! as_type_ref {
+    ($fn_name:ident, $inner:tt, $inner_type:ident) => {
+        pub fn $fn_name(&self) -> Option<&$inner_type> {
+            match self {
+                Self::$inner(inner) => Some(inner),
+                _ => None,
+            }
+        }
+    };
+}
+
 // Cast implementations
 impl DataBlock {
     as_type!(as_all_null, AllNull, AllNullDataBlock);
@@ -877,6 +886,13 @@ impl DataBlock {
     as_type!(as_variable_width, VariableWidth, VariableWidthBlock);
     as_type!(as_struct, Struct, StructDataBlock);
     as_type!(as_dictionary, Dictionary, DictionaryDataBlock);
+    as_type_ref!(as_all_null_ref, AllNull, AllNullDataBlock);
+    as_type_ref!(as_nullable_ref, Nullable, NullableDataBlock);
+    as_type_ref!(as_fixed_width_ref, FixedWidth, FixedWidthDataBlock);
+    as_type_ref!(as_fixed_size_list_ref, FixedSizeList, FixedSizeListBlock);
+    as_type_ref!(as_variable_width_ref, VariableWidth, VariableWidthBlock);
+    as_type_ref!(as_struct_ref, Struct, StructDataBlock);
+    as_type_ref!(as_dictionary_ref, Dictionary, DictionaryDataBlock);
 }
 
 // Methods to convert from Arrow -> DataBlock
@@ -1335,7 +1351,7 @@ impl From<ArrayRef> for DataBlock {
 }
 
 pub trait DataBlockBuilderImpl {
-    fn append(&mut self, data_block: DataBlock, selection: &[Range<u64>]);
+    fn append(&mut self, data_block: &DataBlock, selection: Range<u64>);
     fn finish(self: Box<Self>) -> DataBlock;
 }
 
@@ -1359,8 +1375,8 @@ impl DataBlockBuilder {
         self.builder.as_mut().unwrap().as_mut()
     }
 
-    pub fn append(&mut self, data_block: DataBlock, selection: &[Range<u64>]) {
-        self.get_builder(&data_block).append(data_block, selection);
+    pub fn append(&mut self, data_block: &DataBlock, selection: Range<u64>) {
+        self.get_builder(data_block).append(data_block, selection);
     }
 
     pub fn finish(self) -> DataBlock {

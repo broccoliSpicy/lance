@@ -452,10 +452,16 @@ impl FixedPerValueCompressor for ValueEncoder {
 #[cfg(test)]
 pub(crate) mod tests {
 
+    use std::{collections::HashMap, sync::Arc};
+
+    use arrow_array::{Array, Int32Array};
     use arrow_schema::{DataType, Field, TimeUnit};
     use rstest::rstest;
 
-    use crate::{testing::check_round_trip_encoding_random, version::LanceFileVersion};
+    use crate::{
+        testing::{check_round_trip_encoding_of_data, check_round_trip_encoding_random, TestCases},
+        version::LanceFileVersion,
+    };
 
     const PRIMITIVE_TYPES: &[DataType] = &[
         DataType::Null,
@@ -493,6 +499,55 @@ pub(crate) mod tests {
             log::info!("Testing encoding for {:?}", data_type);
             let field = Field::new("", data_type.clone(), false);
             check_round_trip_encoding_random(field, version).await;
+        }
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn test_miniblock_stress() {
+        // Tests for strange page sizes and batch sizes and validity scenarios for miniblock
+
+        // 10K integers, 100 per array, all valid
+        let data1 = (0..100)
+            .map(|_| Arc::new(Int32Array::from_iter_values(0..100)) as Arc<dyn Array>)
+            .collect::<Vec<_>>();
+
+        // Same as above but with mixed validity
+        let data2 = (0..100)
+            .map(|_| {
+                Arc::new(Int32Array::from_iter((0..100).map(|i| {
+                    if i % 2 == 0 {
+                        Some(i)
+                    } else {
+                        None
+                    }
+                }))) as Arc<dyn Array>
+            })
+            .collect::<Vec<_>>();
+
+        // Same as above but with all null for first half then all valid
+        // TODO: Re-enable once the all-null path is complete
+        let _data3 = (0..100)
+            .map(|chunk_idx| {
+                Arc::new(Int32Array::from_iter((0..100).map(|i| {
+                    if chunk_idx < 50 {
+                        None
+                    } else {
+                        Some(i)
+                    }
+                }))) as Arc<dyn Array>
+            })
+            .collect::<Vec<_>>();
+
+        for data in [data1, data2 /*data3*/] {
+            for batch_size in [10, 100, 1500, 15000] {
+                // 40000 bytes of data
+                let test_cases = TestCases::default()
+                    .with_page_sizes(vec![1000, 2000, 3000, 60000])
+                    .with_batch_size(batch_size)
+                    .with_file_version(LanceFileVersion::V2_1);
+
+                check_round_trip_encoding_of_data(data.clone(), &test_cases, HashMap::new()).await;
+            }
         }
     }
 }

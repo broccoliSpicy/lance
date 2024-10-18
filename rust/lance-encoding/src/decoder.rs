@@ -225,7 +225,7 @@ use futures::stream::{self, BoxStream};
 use futures::{FutureExt, StreamExt};
 use lance_arrow::DataTypeExt;
 use lance_core::cache::{CapacityMode, FileMetadataCache};
-use lance_core::datatypes::{Field, Schema, BLOB_DESC_FIELD};
+use lance_core::datatypes::{Field, Schema, BLOB_DESC_LANCE_FIELD};
 use log::{debug, trace, warn};
 use snafu::{location, Location};
 use tokio::sync::mpsc::error::SendError;
@@ -238,7 +238,7 @@ use crate::buffer::LanceBuffer;
 use crate::data::DataBlock;
 use crate::encoder::{values_column_encoding, EncodedBatch};
 use crate::encodings::logical::binary::BinaryFieldScheduler;
-use crate::encodings::logical::blob::{BlobFieldScheduler, DESC_FIELD_LANCE};
+use crate::encodings::logical::blob::BlobFieldScheduler;
 use crate::encodings::logical::list::{ListFieldScheduler, OffsetPageInfo};
 use crate::encodings::logical::primitive::{
     PrimitiveFieldScheduler, StructuralPrimitiveFieldScheduler,
@@ -756,21 +756,10 @@ impl CoreFieldDecoderStrategy {
             let column_info = column_infos.next().unwrap().clone();
             // Column is blob and user is asking for binary data
             if let Some(blob_col) = Self::unwrap_blob(column_info.as_ref()) {
-<<<<<<< HEAD
-                let desc_scheduler = self.create_primitive_scheduler(
-                    BLOB_DESC_FIELD.data_type(),
-                    chain.current_path(),
-                    &blob_col,
-                    buffers,
-                )?;
-                let blob_scheduler = Arc::new(BlobFieldScheduler::new(desc_scheduler));
-                return Ok((chain, Ok(blob_scheduler)));
-=======
                 let desc_scheduler =
-                    self.create_primitive_scheduler(&DESC_FIELD_LANCE, &blob_col, buffers)?;
+                    self.create_primitive_scheduler(&BLOB_DESC_LANCE_FIELD, &blob_col, buffers)?;
                 let blob_scheduler = Box::new(BlobFieldScheduler::new(desc_scheduler.into()));
                 return Ok(blob_scheduler);
->>>>>>> 8992f2e7 (Add 2.1 read path)
             }
             if let Some(page_info) = column_info.page_infos.first() {
                 if matches!(
@@ -855,13 +844,7 @@ impl CoreFieldDecoderStrategy {
                 // Column is blob and user is asking for descriptions
                 if let Some(blob_col) = Self::unwrap_blob(column_info.as_ref()) {
                     // Can use primitive scheduler here since descriptions are always packed struct
-                    let desc_scheduler = self.create_primitive_scheduler(
-                        &data_type,
-                        chain.current_path(),
-                        &blob_col,
-                        buffers,
-                    )?;
-                    return Ok((chain, Ok(desc_scheduler)));
+                    return self.create_primitive_scheduler(field, &blob_col, buffers);
                 }
 
                 if Self::check_packed_struct(column_info) {
@@ -961,17 +944,6 @@ impl DecodeBatchScheduler {
         };
         let arrow_schema = ArrowSchema::from(schema);
         let root_fields = arrow_schema.fields().clone();
-<<<<<<< HEAD
-        let mut columns = Vec::with_capacity(column_infos.len() + 1);
-        columns.push(Arc::new(root_column(num_rows)));
-        columns.extend(column_infos.iter().cloned());
-        let adjusted_column_indices = [0_u32]
-            .into_iter()
-            .chain(column_indices.iter().map(|i| i.saturating_add(1)))
-            .collect::<Vec<_>>();
-        let mut column_iter = ColumnInfoIter::new(columns, &adjusted_column_indices);
-=======
->>>>>>> 8992f2e7 (Add 2.1 read path)
         let root_type = DataType::Struct(root_fields.clone());
         let mut root_field = Field::try_from(&ArrowField::new("root", root_type, false))?;
         // root_field.children and schema.fields should be identical at this point but the latter
@@ -1005,7 +977,7 @@ impl DecodeBatchScheduler {
 
             let adjusted_column_indices = [0_u32]
                 .into_iter()
-                .chain(column_indices.iter().map(|i| *i + 1))
+                .chain(column_indices.iter().map(|i| i.saturating_add(1)))
                 .collect::<Vec<_>>();
             let mut column_iter = ColumnInfoIter::new(columns, &adjusted_column_indices);
             let root_scheduler = CoreFieldDecoderStrategy::default()
