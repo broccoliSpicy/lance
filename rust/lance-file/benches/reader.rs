@@ -2,8 +2,10 @@
 // SPDX-FileCopyrightText: Copyright The Lance Authors
 use std::sync::{Arc, Mutex};
 
-use arrow_array::{cast::AsArray, types::Int32Type};
-use arrow_schema::DataType;
+use arrow_array::{cast::AsArray, types::Int32Type, types::Int64Type, ArrayRef, Int32Array, Int64Array, RecordBatch};
+
+use arrow_schema::{DataType, Schema as ArrowSchema, Field as ArrowField};
+
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use futures::{FutureExt, StreamExt};
 use lance_encoding::decoder::{DecoderPlugins, FilterExpression};
@@ -23,10 +25,23 @@ use lance_io::{
 fn bench_reader(c: &mut Criterion) {
     for version in [LanceFileVersion::V2_0, LanceFileVersion::V2_1] {
         let mut group = c.benchmark_group(&format!("reader_{}", version));
+        /* 
         let data = lance_datagen::gen()
             .anon_col(lance_datagen::array::rand_type(&DataType::Int32))
             .into_batch_rows(lance_datagen::RowCount::from(2 * 1024 * 1024))
             .unwrap();
+        */
+        let array = Int64Array::from(vec![5; 16 * 1024 * 1024]);
+        let array_ref: ArrayRef = Arc::new(array);
+
+        let schema = Arc::new(ArrowSchema::new(vec![ArrowField::new(
+            "i",
+            DataType::Int64,
+            false,
+        )]));
+        // Create schema and record batch
+        let data = RecordBatch::try_new(schema, vec![array_ref]).unwrap();
+
         let rt = tokio::runtime::Runtime::new().unwrap();
 
         let tempdir = tempfile::tempdir().unwrap();
@@ -47,6 +62,7 @@ fn bench_reader(c: &mut Criterion) {
         .unwrap();
         rt.block_on(writer.write_batch(&data)).unwrap();
         rt.block_on(writer.finish()).unwrap();
+
         group.throughput(criterion::Throughput::Bytes(
             data.get_array_memory_size() as u64
         ));
@@ -87,7 +103,7 @@ fn bench_reader(c: &mut Criterion) {
                                 let row_count = batch.num_rows();
                                 let sum = batch
                                     .column(0)
-                                    .as_primitive::<Int32Type>()
+                                    .as_primitive::<Int64Type>()
                                     .values()
                                     .iter()
                                     .map(|v| *v as i64)

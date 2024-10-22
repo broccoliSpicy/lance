@@ -22,7 +22,7 @@ use crate::encodings::logical::blob::BlobFieldEncoder;
 use crate::encodings::logical::primitive::PrimitiveStructuralEncoder;
 use crate::encodings::logical::r#struct::StructFieldEncoder;
 use crate::encodings::logical::r#struct::StructStructuralEncoder;
-use crate::encodings::physical::bitpack_fastlanes::compute_compressed_bit_width_for_non_neg;
+use crate::encodings::physical::bitpack_fastlanes::{compute_compressed_bit_width_for_non_neg, BitpackMiniBlockEncoder};
 use crate::encodings::physical::bitpack_fastlanes::BitpackedForNonNegArrayEncoder;
 use crate::encodings::physical::block_compress::CompressionScheme;
 use crate::encodings::physical::dictionary::AlreadyDictionaryEncoder;
@@ -604,7 +604,7 @@ impl CoreArrayEncodingStrategy {
             // then a bitpacked array for the narrow(bit-width) values, I need `BitpackedForNeg` to be merged first, I am
             // thinking about putting this sparse array in the metadata so bitpacking remain using one page buffer only.
             DataType::Int8 | DataType::Int16 | DataType::Int32 | DataType::Int64 => {
-                if version >= LanceFileVersion::V2_1 && arrays[0].data_type() == data_type {
+                if version >= LanceFileVersion::V2_0 && arrays[0].data_type() == data_type {
                     let compressed_bit_width = compute_compressed_bit_width_for_non_neg(arrays);
                     Ok(Box::new(BitpackedForNonNegArrayEncoder::new(
                         compressed_bit_width as usize,
@@ -767,7 +767,10 @@ impl CompressionStrategy for CoreArrayEncodingStrategy {
         _data: &DataBlock,
     ) -> Result<Box<dyn MiniBlockCompressor>> {
         assert!(field.data_type().byte_width() > 0);
+        /* 
         Ok(Box::new(ValueEncoder::default()))
+        */
+        Ok(Box::new(BitpackMiniBlockEncoder::default()))
     }
 
     fn create_fixed_per_value(
