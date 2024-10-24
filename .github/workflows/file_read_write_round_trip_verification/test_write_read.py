@@ -12,12 +12,16 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import os
 import pyarrow.parquet as pq
 from lance.file import LanceFileReader, LanceFileWriter
 
+# Get the current working directory
+current_path = os.getcwd()
+
 # Path to the Parquet file
-file_path = 'drug-reviews.parquet'
-lance_file_path = "drug-reviews.lance"
+file_path = os.path.join(current_path, 'drug-reviews.parquet')
+lance_file_path = os.path.join(current_path, "drug-reviews.lance")
 
 # Read the Parquet file into a PyArrow table
 try:
@@ -32,7 +36,6 @@ try:
 
     assert tab_lance == parquet_table
     assert 1 == 0
-
 
 except Exception as e:
     print(f"Error reading Parquet file: {e}")
