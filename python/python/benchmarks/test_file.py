@@ -43,7 +43,7 @@ def test_scan_integer(tmp_path: Path, benchmark, version):
         reader = LanceFileReader(str(tmp_path / "file.lance"))
         return reader.read_all(batch_size=16 * 1024).to_table()
 
-    result = benchmark.pedantic(read_all, rounds=1, iterations=1)
+    result = benchmark.pedantic(read_all, rounds=10, iterations=10)
 
     assert result.num_rows == NUM_ROWS
 
