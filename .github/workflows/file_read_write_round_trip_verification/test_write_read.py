@@ -19,7 +19,6 @@ from lance.file import LanceFileReader, LanceFileWriter
 file_path = 'drug-reviews.parquet'
 lance_file_path = "drug-reviews.lance"
 
-assert 1 == 0
 # Read the Parquet file into a PyArrow table
 try:
     parquet_table = pq.read_table(file_path)
@@ -32,6 +31,7 @@ try:
     tab_lance = LanceFileReader(lance_file_path).read_all().to_table()
 
     assert tab_lance == parquet_table
+    assert 1 == 0
 
 
 except Exception as e:
