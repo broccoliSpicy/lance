@@ -3,7 +3,6 @@ on: [pull_request]
 
 jobs:
   run:
-    name: Lance File Write Read Round Trip Verification
     runs-on: "ubuntu-24.04"
 
     steps:
