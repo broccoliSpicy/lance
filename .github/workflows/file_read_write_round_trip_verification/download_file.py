@@ -28,12 +28,23 @@ s3 = boto3.client(
 
 # Define the bucket name and the file to download
 bucket_name = 'lance-ci-bucket'
-file_key = 'drug-reviews.parquet'  # S3 path to the file without the 's3://' prefix
-local_file_path = 'drug-reviews.parquet'  # Path to save the downloaded file locally
 
-# Download the file
+# List all objects in the bucket
 try:
-    s3.download_file(bucket_name, file_key, local_file_path)
-    print(f"Downloaded {file_key} from bucket {bucket_name} to {local_file_path}")
+    response = s3.list_objects_v2(Bucket=bucket_name)
+    if 'Contents' in response:
+        for obj in response['Contents']:
+            file_key = obj['Key']
+            local_file_path = os.path.join(os.getcwd(), file_key)  # Save to current directory
+            os.makedirs(os.path.dirname(local_file_path), exist_ok=True)  # Create directories if needed
+
+            # Download the file
+            try:
+                s3.download_file(bucket_name, file_key, local_file_path)
+                print(f"Downloaded {file_key} from bucket {bucket_name} to {local_file_path}")
+            except Exception as e:
+                print(f"Error downloading file {file_key}: {e}")
+    else:
+        print(f"No files found in bucket {bucket_name}")
 except Exception as e:
-    print(f"Error downloading file: {e}")
+    print(f"Error listing objects in bucket {bucket_name}: {e}")
