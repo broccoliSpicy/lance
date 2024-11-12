@@ -245,7 +245,7 @@ impl FileWriter {
         let cache_bytes_per_column = if let Some(data_cache_bytes) = self.options.data_cache_bytes {
             data_cache_bytes / schema.fields.len() as u64
         } else {
-            8 * 1024 * 1024
+            32 * 1024 * 1024
         };
 
         let max_page_bytes = self.options.max_page_bytes.unwrap_or(32 * 1024 * 1024);

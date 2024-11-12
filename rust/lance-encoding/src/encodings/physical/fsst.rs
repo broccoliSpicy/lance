@@ -11,15 +11,10 @@ use lance_core::{Error, Result};
 use snafu::{location, Location};
 
 use crate::{
-    buffer::LanceBuffer,
-    data::{BlockInfo, DataBlock, NullableDataBlock, UsedEncoding, VariableWidthBlock},
-    decoder::{MiniBlockDecompressor, PageScheduler, PrimitivePageDecoder},
-    encoder::{ArrayEncoder, EncodedArray, MiniBlockCompressed, MiniBlockCompressor},
-    format::{
+    buffer::LanceBuffer, data::{BlockInfo, DataBlock, NullableDataBlock, UsedEncoding, VariableWidthBlock}, decoder::{MiniBlockDecompressor, PageScheduler, PrimitivePageDecoder}, encoder::{ArrayEncoder, EncodedArray, MiniBlockCompressed, MiniBlockCompressor}, format::{
         pb::{self},
         ProtobufUtils,
-    },
-    EncodingsIo,
+    }, statistics::{GetStat, Stat}, EncodingsIo
 };
 
 use super::binary::{BinaryMiniBlockDecompressor, BinaryMiniBlockEncoder};
@@ -215,8 +210,10 @@ impl MiniBlockCompressor for FsstMiniBlockEncoder {
         &self,
         data: DataBlock,
     ) -> Result<(MiniBlockCompressed, crate::format::pb::ArrayEncoding)> {
+
         match data {
             DataBlock::VariableWidth(mut variable_width) => {
+                // println!("data.size(): {:?}, num_values: {:?}", variable_width.get_stat(Stat::DataSize), variable_width.num_values);
                 let offsets = variable_width.offsets.borrow_to_typed_slice::<i32>();
                 let offsets_slice = offsets.as_ref();
                 let bytes_data = variable_width.data.into_buffer();
