@@ -20,7 +20,7 @@ num_rows = 1_000_000_000
 parquet_file = "/home/x/int64_data.parquet"
 lance_file = "/home/x/int64_data.lance"
 
-# Step 1: Generate random int32 data between 0 and 1023
+# Step 1: Generate random int32 data in [0, 1024 * 1024)
 data = np.random.randint(low=0, high=1024 * 1024, size=num_rows, dtype=np.int64)
 
 # Step 2: Convert to PyArrow Table
